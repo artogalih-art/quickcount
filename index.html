@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Quick Count Real-Time Firebase</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+        h1, h2 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        .sub-title {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 25px;
+        }
+        .total-suara {
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 30px;
+            background: #e1e8ed;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .kandidat-card {
+            background: #fafafa;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .kandidat-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .progress-bar-bg {
+            background: #e0e0e0;
+            border-radius: 20px;
+            overflow: hidden;
+            height: 25px;
+            margin-bottom: 15px;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            transition: width 0.5s ease-in-out;
+        }
+        .fill-1 { background: #3498db; }
+        .fill-2 { background: #e67e22; }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .btn-tambah { background: #2ecc71; color: white; }
+        .btn-tambah:hover { background: #27ae60; }
+        .btn-kurang { background: #e74c3c; color: white; }
+        .btn-kurang:hover { background: #c0392b; }
+        .btn-reset {
+            display: block;
+            width: 100%;
+            background: #7f8c8d;
+            color: white;
+            padding: 12px;
+            margin-top: 30px;
+            font-size: 1rem;
+            border-radius: 5px;
+        }
+        .btn-reset:hover { background: #95a5a6; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📊 Real-Time Quick Count</h1>
+    <div class="sub-title">Data tersinkronisasi otomatis di seluruh perangkat menggunakan Firebase Cloud</div>
+    
+    <div class="total-suara">
+        Total Suara Masuk: <span id="totalSuara">0</span>
+    </div>
+
+    <!-- Kandidat 1 -->
+    <div class="kandidat-card">
+        <div class="kandidat-info">
+            <span>01. Paslon Alfa & Bravo</span>
+            <span id="persenKandidat1">0% (0 Suara)</span>
+        </div>
+        <div class="progress-bar-bg">
+            <div id="barKandidat1" class="progress-bar-fill fill-1"></div>
+        </div>
+        <div class="btn-group">
+            <button class="btn-tambah" id="btn-tambah-1">+ Tambah Suara</button>
+            <button class="btn-kurang" id="btn-kurang-1">- Kurangi</button>
+        </div>
+    </div>
+
+    <!-- Kandidat 2 -->
+    <div class="kandidat-card">
+        <div class="kandidat-info">
+            <span>02. Paslon Charlie & Delta</span>
+            <span id="persenKandidat2">0% (0 Suara)</span>
+        </div>
+        <div class="progress-bar-bg">
+            <div id="barKandidat2" class="progress-bar-fill fill-2"></div>
+        </div>
+        <div class="btn-group">
+            <button class="btn-tambah" id="btn-tambah-2">+ Tambah Suara</button>
+            <button class="btn-kurang" id="btn-kurang-2">- Kurangi</button>
+        </div>
+    </div>
+
+    <!-- Tombol Reset -->
+    <button class="btn-reset" id="btn-reset">🔄 Reset Semua Data Database</button>
+</div>
+
+<!-- Menggunakan ES Modules Firebase Terbaru (v10+) -->
+<script type="module">
+    import { initializeApp } from "https://gstatic.com";
+    import { getDatabase, ref, onValue, set, runTransaction } from "https://gstatic.com";
+
+    // ⚠️ GANTI DENGAN KONFIGURASI FIREBASE ANDA SENDIRI
+    const firebaseConfig = {
+  apiKey: "AIzaSyBvLFDgA4lv8xnXyGI3zT4zq-4NtQoBL58",
+  authDomain: "pilkades-kalwet.firebaseapp.com",
+  projectId: "pilkades-kalwet",
+  storageBucket: "pilkades-kalwet.firebasestorage.app",
+  messagingSenderId: "837036095427",
+  appId: "1:837036095427:web:ff3864134761ac248c6f76",
+  measurementId: "G-JY5F742KNX"
+};
+
+    // Inisialisasi Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const dbRef = ref(db, 'quickcount');
+
+    // Variabel lokal untuk menyimpan state suara
+    let suara1 = 0;
+    let suara2 = 0;
+
+    // 🔄 MENDENGARKAN PERUBAHAN DATA SECARA REAL-TIME DARI CLOUD
+    onValue(dbRef, (snapshot) => {
+        const data = snapshot.val();
+        
+        // Mengisi nilai jika database masih kosong
+        suara1 = (data && data.paslon1) ? data.paslon1 : 0;
+        suara2 = (data && data.paslon2) ? data.paslon2 : 0;
+
+        const total = suara1 + suara2;
+        
+        // Hitung persentase suara
+        const persen1 = total > 0 ? ((suara1 / total) * 100).toFixed(1) : 0;
+        const persen2 = total > 0 ? ((suara2 / total) * 100).toFixed(1) : 0;
+
+        // Perbarui elemen UI Halaman Web
+        document.getElementById('totalSuara').innerText = total;
+        document.getElementById('persenKandidat1').innerText = `${persen1}% (${suara1} Suara)`;
+        document.getElementById('persenKandidat2').innerText = `${persen2}% (${suara2} Suara)`;
+        document.getElementById('barKandidat1').style.width = persen1 + '%';
+        document.getElementById('barKandidat2').style.width = persen2 + '%';
+    });
+
+    // ➕ FUNGSI TRANSACTION UNTUK MENCEGAH BENTROKAN DATA JIKA DI-KLIK BERSAMAAN
+    function ubahSuara(paslon, nilai) {
+        const paslonRef = ref(db, `quickcount/${paslon}`);
+        runTransaction(paslonRef, (currentValue) => {
+            let newValue = (currentValue || 0) + nilai;
+            return newValue < 0 ? 0 : newValue; // Mencegah nilai minus
+        });
+    }
+
+    // Sambungkan fungsi ke tombol-tombol HTML
+    document.getElementById('btn-tambah-1').addEventListener('click', () => ubahSuara('paslon1', 1));
+    document.getElementById('btn-kurang-1').addEventListener('click', () => ubahSuara('paslon1', -1));
+    document.getElementById('btn-tambah-2').addEventListener('click', () => ubahSuara('paslon2', 1));
+    document.getElementById('btn-kurang-2').addEventListener('click', () => ubahSuara('paslon2', -1));
+
+    // Tombol Reset Seluruh Database
+    document.getElementById('btn-reset').addEventListener('click', () => {
+        if (confirm("Apakah Anda yakin ingin menghapus & mereset seluruh data di Cloud?")) {
+            set(dbRef, {
+                paslon1: 0,
+                paslon2: 0
+            });
+        }
+    });
+</script>
+
+</body>
+</html>
